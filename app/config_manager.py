@@ -19,6 +19,7 @@ DEFAULT_CROP_PROFILES = {
     "sextop": {"top": 0.3052, "bottom": 0.0545, "left": 0, "right": 1},
     "phimKK": {"top": 0.1861, "bottom": 0.0198, "left": 0, "right": 1},
     "titdam": {"top": 0.2455, "bottom": 0.0746, "left": 0.1743, "right": 0.8322},
+    "tiktok": {"top": 0.45, "bottom": 0.05, "left": 0.0, "right": 1.0},
 }
 
 

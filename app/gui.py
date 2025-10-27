@@ -168,7 +168,7 @@ class OCRGui:
 
         self.profile_combobox = ttk.Combobox(
             crop_frame,
-            values=["Chọn profile", "vlxx, javhd", "sextop", "phimKK", "titdam", "Tuỳ chỉnh"],
+            values=["Chọn profile", "vlxx, javhd", "sextop", "phimKK", "titdam", "tiktok", "Tuỳ chỉnh"],
             state="readonly",
         )
         self.profile_combobox.pack(side="left", padx=5)
