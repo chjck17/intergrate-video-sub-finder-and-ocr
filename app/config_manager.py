@@ -22,6 +22,11 @@ DEFAULT_CROP_PROFILES = {
 }
 
 
+def _default_vsf_path() -> str:
+    candidate = Path(DEFAULT_VIDEOSUBFINDER_PATH)
+    return str(candidate) if candidate.exists() else ""
+
+
 def load_config() -> Tuple[str, bool, bool, bool, str, int, Dict[str, Dict[str, float]]]:
     """Read persisted configuration values, falling back to sane defaults."""
     config = configparser.ConfigParser()
@@ -34,15 +39,20 @@ def load_config() -> Tuple[str, bool, bool, bool, str, int, Dict[str, Dict[str, 
         delete_raw_texts = config.getboolean("settings", "delete_raw_texts", fallback=False)
         delete_texts = config.getboolean("settings", "delete_texts", fallback=False)
         nen_raw_texts = config.getboolean("settings", "nen_raw_texts", fallback=False)
-        videosubfinder_path = config["settings"].get("videosubfinder_path", DEFAULT_VIDEOSUBFINDER_PATH)
+        videosubfinder_path = config["settings"].get("videosubfinder_path", _default_vsf_path())
         threads = config["settings"].getint("threads", fallback=DEFAULT_THREADS)
     else:
         folder_id = DEFAULT_FOLDER_ID
         delete_raw_texts = False
         delete_texts = False
         nen_raw_texts = False
-        videosubfinder_path = DEFAULT_VIDEOSUBFINDER_PATH
+        videosubfinder_path = _default_vsf_path()
         threads = DEFAULT_THREADS
+
+    if not videosubfinder_path:
+        default_candidate = _default_vsf_path()
+        if default_candidate:
+            videosubfinder_path = default_candidate
 
     if threads <= 0:
         threads = DEFAULT_THREADS
