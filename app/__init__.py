@@ -1,0 +1,1 @@
+"""Refactored OCR application package."""
