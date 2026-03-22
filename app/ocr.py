@@ -7,6 +7,7 @@ import datetime
 import io
 import os
 import shutil
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -14,6 +15,8 @@ import tkinter as tk
 from tkinter import messagebox, scrolledtext
 
 import httplib2
+import cv2
+import numpy as np
 from apiclient import discovery
 from apiclient.http import MediaFileUpload, MediaIoBaseDownload
 
@@ -27,6 +30,37 @@ STOP_FLAG = False
 TOTAL_IMAGES = 0
 COMPLETED_SCANS = 0
 START_TIME = 0.0
+
+
+def preprocess_image_with_color(image_path: Path, target_color: tuple[int, int, int], threshold: int = 35) -> Path | None:
+    """Create a high-contrast version of the image focusing on pixels near target_color."""
+    if target_color is None:
+        return None
+
+    image = cv2.imread(str(image_path))
+    if image is None:
+        return None
+
+    try:
+        bgr_target = np.uint8([[target_color[::-1]]])
+        lab_target = cv2.cvtColor(bgr_target, cv2.COLOR_BGR2LAB)[0][0]
+    except Exception:
+        return None
+
+    lab_image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    diff = np.linalg.norm(lab_image.astype(np.int16) - lab_target.astype(np.int16), axis=2)
+    mask = diff <= threshold
+
+    processed = np.full_like(image, 255)
+    processed[mask] = [0, 0, 0]
+
+    try:
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        cv2.imwrite(tmp_file.name, processed)
+        tmp_file.close()
+        return Path(tmp_file.name)
+    except Exception:
+        return None
 
 
 def reset_state():
@@ -73,20 +107,43 @@ def ocr_image(gui, image_path, line, credentials, folder_id, current_directory):
             LOGGER.log("❌ Quá trình đã được dừng.")
             return
 
+        cleanup_path: Path | None = None
         try:
             http = credentials.authorize(httplib2.Http())
             service = discovery.build("drive", "v3", http=http)
-            imgfile = str(image_path.absolute())
+            upload_path = image_path
+            if getattr(gui, "subtitle_color", None):
+                processed_path = preprocess_image_with_color(image_path, gui.subtitle_color)
+                if processed_path:
+                    upload_path = processed_path
+                    cleanup_path = processed_path
+
+            imgfile = str(upload_path)
             imgname = str(image_path.name)
             raw_txtfile = current_directory / "raw_texts" / f"{imgname[:-5]}.txt"
             txtfile = current_directory / "texts" / f"{imgname[:-5]}.txt"
 
-            mime = "application/vnd.google-apps.document"
+            google_doc_mime = "application/vnd.google-apps.document"
+            image_mime = {
+                ".jpeg": "image/jpeg",
+                ".jpg": "image/jpeg",
+                ".png": "image/png",
+                ".bmp": "image/bmp",
+                ".gif": "image/gif",
+            }.get(upload_path.suffix.lower(), "image/jpeg")
+
+            target_folder = (folder_id or "").strip() or "root"
+            file_metadata = {
+                "name": imgname,
+                "mimeType": google_doc_mime,
+                "parents": [target_folder],
+            }
+
             res = (
                 service.files()
                 .create(
-                    body={"name": imgname, "mimeType": mime, "parents": [folder_id]},
-                    media_body=MediaFileUpload(imgfile, mimetype=mime, resumable=True),
+                    body=file_metadata,
+                    media_body=MediaFileUpload(imgfile, mimetype=image_mime, resumable=True),
                 )
                 .execute()
             )
@@ -130,12 +187,28 @@ def ocr_image(gui, image_path, line, credentials, folder_id, current_directory):
                 "",
             ]
 
+            if cleanup_path:
+                try:
+                    cleanup_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
             break
         except Exception as exc:
             tries += 1
             if tries > 5:
-                LOGGER.log(f"Lỗi sau 5 lần thử: {exc}")
+                LOGGER.log(f"Loi sau 5 lan thu: {exc}")
+                if cleanup_path:
+                    try:
+                        cleanup_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
                 raise
+            if cleanup_path:
+                try:
+                    cleanup_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
             time.sleep(1)
             continue
 
@@ -250,6 +323,7 @@ def start_processing(
         _nen_raw_texts,
         _,
         threads,
+        _,
         _,
     ) = load_config()
 

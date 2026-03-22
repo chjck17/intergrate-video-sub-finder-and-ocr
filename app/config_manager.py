@@ -5,7 +5,7 @@ from __future__ import annotations
 import configparser
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 from .constants import (
     DEFAULT_FOLDER_ID,
@@ -28,7 +28,7 @@ def _default_vsf_path() -> str:
     return str(candidate) if candidate.exists() else ""
 
 
-def load_config() -> Tuple[str, bool, bool, bool, str, int, Dict[str, Dict[str, float]]]:
+def load_config() -> Tuple[str, bool, bool, bool, str, int, Dict[str, Dict[str, float]], Optional[Tuple[int, int, int]]]:
     """Read persisted configuration values, falling back to sane defaults."""
     config = configparser.ConfigParser()
     config_path = Path("config.ini")
@@ -74,6 +74,15 @@ def load_config() -> Tuple[str, bool, bool, bool, str, int, Dict[str, Dict[str, 
                 f"{profile_key}_right", fallback=defaults["right"]
             )
 
+    subtitle_color: Optional[Tuple[int, int, int]] = None
+    if "settings" in config and config["settings"].get("subtitle_color"):
+        try:
+            parts = [int(part.strip()) for part in config["settings"]["subtitle_color"].split(",")]
+            if len(parts) == 3:
+                subtitle_color = tuple(max(0, min(255, value)) for value in parts)  # clamp values
+        except ValueError:
+            subtitle_color = None
+
     return (
         folder_id,
         delete_raw_texts,
@@ -82,6 +91,7 @@ def load_config() -> Tuple[str, bool, bool, bool, str, int, Dict[str, Dict[str, 
         videosubfinder_path,
         threads,
         crop_profiles,
+        subtitle_color,
     )
 
 
@@ -94,6 +104,7 @@ def save_config(
     threads: int,
     crop_profiles: Dict[str, Dict[str, float]],
     custom_crop: Dict[str, float] | None = None,
+    subtitle_color: Optional[Tuple[int, int, int]] = None,
 ) -> None:
     """Persist the current configuration to disk."""
     config = configparser.ConfigParser()
@@ -110,6 +121,10 @@ def save_config(
     config["settings"]["nen_raw_texts"] = str(nen_raw_texts)
     config["settings"]["videosubfinder_path"] = videosubfinder_path
     config["settings"]["threads"] = str(max(1, threads))
+    if subtitle_color:
+        config["settings"]["subtitle_color"] = ",".join(str(int(c)) for c in subtitle_color)
+    elif "subtitle_color" in config["settings"]:
+        del config["settings"]["subtitle_color"]
 
     if "crop_profiles" not in config:
         config["crop_profiles"] = {}

@@ -1,0 +1,46 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Byte-compiled / optimized / DLL files
+*.class
+
+# Virtual environments
+.env/
+.venv/
+dist
+raw_texts
+texts
+
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and local data
+*.log
+logs/
+config.ini.backup
+
+# VSF output directories
+video-app/RGBImages/
+video-app/TXTImages/
+video-app/ISAImages/
+video-app/ILAImages/
+video-app/ImagesJoined/
+video-app/DebugImages/
+video-app/TXTResults/
+build/SEGG_OCR_Tool/
+app/__pycache__/
+app\__pycache__\
+# Reports / temp
+*.tmp
+*.temp
+*.bak
+
+# Credentials
+credentials.json
+token.json

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import psutil
 import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext, ttk
+from tkinter import colorchooser, filedialog, messagebox, scrolledtext, ttk
 
 from .config_manager import load_config, save_config
 from .crop_selector import CropSelectorApp
@@ -38,6 +38,7 @@ class OCRGui:
             self.videosubfinder_path,
             self.threads,
             self.crop_profiles,
+            self.subtitle_color,
         ) = load_config()
 
         self.duration = None
@@ -232,10 +233,20 @@ class OCRGui:
         self.progress_bar = ttk.Progressbar(self.root, orient="horizontal", length=612, mode="determinate")
         self.progress_bar.pack(pady=(1, 0))
 
+        color_frame = tk.Frame(self.root)
+        color_frame.pack(padx=10, pady=(0, 5), fill="x")
+        tk.Label(color_frame, text="Subtitle color (RGB)").pack(side="left", padx=5)
+        self.color_preview = tk.Label(color_frame, width=10, relief="sunken")
+        self.color_preview.pack(side="left", padx=5)
+        self.color_value_label = tk.Label(color_frame, text="Not set")
+        self.color_value_label.pack(side="left", padx=5)
+        tk.Button(color_frame, text="Pick subtitle color", command=self.choose_subtitle_color).pack(side="right", padx=5)
+
         log_frame = tk.Frame(self.root)
         log_frame.pack(pady=(0, 5), fill="both", expand=True)
         self.log_text = tk.Text(log_frame, height=5, wrap="word", state="disabled", bg="#0C0C0C", fg="#CCCCCC")
         self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
+        self._update_color_preview()
 
     def validate_float_input(self, action, value):
         if action != "1":
@@ -308,6 +319,44 @@ class OCRGui:
         except ValueError:
             return None
 
+    def _rgb_to_hex(self, color):
+        if not color:
+            return "#000000"
+        return "#{:02X}{:02X}{:02X}".format(*color)
+
+    def _update_color_preview(self):
+        if self.subtitle_color:
+            hex_value = self._rgb_to_hex(self.subtitle_color)
+            self.color_preview.config(bg=hex_value)
+            self.color_value_label.config(text=f"{self.subtitle_color}")
+        else:
+            self.color_preview.config(bg=self.root.cget("bg"))
+            self.color_value_label.config(text="Not set")
+
+    def _persist_config(self, custom_crop=None):
+        save_config(
+            self.folder_id,
+            self.delete_raw_texts_var.get(),
+            self.delete_texts_var.get(),
+            self.nen_raw_texts_var.get(),
+            self.videosubfinder_path,
+            self.threads,
+            self.crop_profiles,
+            custom_crop=custom_crop,
+            subtitle_color=self.subtitle_color,
+        )
+
+    def choose_subtitle_color(self):
+        initial = self.subtitle_color if self.subtitle_color else (255, 255, 255)
+        color_tuple = colorchooser.askcolor(color=initial, title="Select subtitle color")
+        if not color_tuple or not color_tuple[0]:
+            return
+        r, g, b = map(int, color_tuple[0])
+        self.subtitle_color = (r, g, b)
+        self._update_color_preview()
+        self._persist_config(self._get_custom_crop())
+        LOGGER.log(f"Picked subtitle color: {self.subtitle_color}")
+
     def on_start_button_click(self):
         file_sub = self.subtitle_entry.get()
         images_dirr = self.images_entry.get()
@@ -318,16 +367,7 @@ class OCRGui:
             return
 
         custom_crop = self._get_custom_crop()
-        save_config(
-            self.folder_id,
-            self.delete_raw_texts_var.get(),
-            self.delete_texts_var.get(),
-            self.nen_raw_texts_var.get(),
-            self.videosubfinder_path,
-            self.threads,
-            self.crop_profiles,
-            custom_crop=custom_crop,
-        )
+        self._persist_config(custom_crop)
 
         log_file_path = file_sub if file_sub.endswith(".srt") else f"{file_sub}.srt"
         log_file_path = log_file_path.replace(".srt", ".log")
